@@ -31,5 +31,5 @@ The first time you run this tool, it will ask you to inform:
 ```
 pip install build
 python -m build
-pip install dist/aws_assume_role_otp-0.1-py3-none-any.whl
+pip install dist/aws_assume_role_otp-<Version>-py3-none-any.whl
 ```
