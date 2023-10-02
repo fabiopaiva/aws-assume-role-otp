@@ -1,15 +1,15 @@
 import typer
 
 from aws_assume_role_otp.config import initial_config, is_first_run
+from aws_assume_role_otp.credentials import add_role as call_add_role
 from aws_assume_role_otp.credentials import (
     configure_credentials,
     credentials_configured,
     get_credentials,
     get_roles,
     prompt_role,
-    add_role as call_add_role,
-    remove_role as call_remove_role,
 )
+from aws_assume_role_otp.credentials import remove_role as call_remove_role
 from aws_assume_role_otp.sts import assume_selected_role
 
 app = typer.Typer()
