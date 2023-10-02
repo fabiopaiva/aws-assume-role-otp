@@ -15,6 +15,18 @@ aws-assume-role-otp
 
 ```
 
+### Add role
+```bash
+aws-assume-role-otp --add-role
+
+```
+
+### Remove role
+```bash
+aws-assume-role-otp --remove-role
+
+```
+
 ### First time configuration
 
 The first time you run this tool, it will ask you to inform:
@@ -31,5 +43,20 @@ The first time you run this tool, it will ask you to inform:
 ```
 pip install build
 python -m build
-pip install dist/aws_assume_role_otp-<Version>-py3-none-any.whl
+pip install dist/aws_assume_role_otp-0.3-py3-none-any.whl
 ```
+
+## Publishing
+
+```
+pip install twine
+python -m twine upload dist/*
+```
+
+# Changelog
+
+## [0.3] - 2023-10-02
+
+### Added
+
+- Allow to add or remove roles

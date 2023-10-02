@@ -26,13 +26,11 @@ class Credentials:
         secret_access_key: str,
         otp: str,
         serial: str,
-        roles: list[Role] = [],
     ):
         self.access_key_id = access_key_id
         self.secret_access_key = secret_access_key
         self.otp = otp
         self.serial = serial
-        self.roles = roles
 
 
 def credentials_configured() -> bool:
@@ -56,7 +54,7 @@ def credentials_configured() -> bool:
         return False
 
 
-def persist(credentias: Credentials):
+def persist(credentias: Credentials, roles: list[Role]):
     config = get_config()
     with open(config.key_path, "w") as f:
         f.write(
@@ -68,8 +66,7 @@ def persist(credentias: Credentials):
                         "otp": credentias.otp,
                         "serial": credentias.serial,
                         "roles": [
-                            {"arn": role.arn, "profile": role.profile}
-                            for role in credentias.roles
+                            {"arn": role.arn, "profile": role.profile} for role in roles
                         ],
                     }
                 )
@@ -86,8 +83,60 @@ def get_credentials() -> Credentials:
             secret_access_key=data["secret_access_key"],
             otp=data["otp"],
             serial=data["serial"],
-            roles=[Role(role["arn"], role["profile"]) for role in data["roles"]],
         )
+
+
+def get_roles() -> list[Role]:
+    config = get_config()
+    with open(config.key_path, "r") as f:
+        data = json.loads(decrypt(f.read()))
+        return [Role(role["arn"], role["profile"]) for role in data["roles"]]
+
+
+def add_roles_form(credentials: Credentials) -> list[Role]:
+    color_print([("#FFE4B5", "Inform the Roles ARN and alias you want to use")])
+    roles = []
+    proceed = False
+    totp = pyotp.TOTP(credentials.otp)
+    while not proceed:
+        questions = [
+            {
+                "type": "input",
+                "message": "Role ARN",
+                "name": "arn",
+                "validate": lambda result: len(result) > 0,
+                "invalid_message": "Input cannot be empty.",
+            },
+            {
+                "type": "input",
+                "message": "AWS Profile to use when assuming the role. Leave it empty to export environment variables",
+                "name": "profile",
+            },
+        ]
+        results = prompt(questions)
+        if not can_assume_role(
+            access_key_id=credentials.access_key_id,
+            secret_access_key=credentials.secret_access_key,
+            role_arn=results["arn"],
+            serial=credentials.serial,
+            token=totp.now(),
+        ):
+            color_print(
+                [
+                    (
+                        "#FF0000",
+                        f"It was not possible to assume the role {results['arn']}. Please check you have the right permissions to assume the role",
+                    )
+                ]
+            )
+            continue
+
+        roles.append(Role(results["arn"], results["profile"]))
+        proceed = not inquirer.confirm(
+            message="Do you want to add another role",
+            default=True,
+        ).execute()
+    return roles
 
 
 def configure_credentials() -> None:
@@ -143,66 +192,22 @@ def configure_credentials() -> None:
         invalid_message="Serial cannot be empty",
     ).execute()
 
-    proceed = False
-    color_print([("#FFE4B5", "Inform the Roles ARN and alias you want to use")])
-    roles = []
-    while not proceed:
-        questions = [
-            {
-                "type": "input",
-                "message": "Role ARN",
-                "name": "arn",
-                "validate": lambda result: len(result) > 0,
-                "invalid_message": "Input cannot be empty.",
-            },
-            {
-                "type": "input",
-                "message": "AWS Profile to use when assuming the role. Leave it empty to export environment variables",
-                "name": "profile",
-            },
-        ]
-        results = prompt(questions)
-        if not can_assume_role(
-            access_key_id=access_key_id,
-            secret_access_key=secret_access_key,
-            role_arn=results["arn"],
-            serial=serial,
-            token=totp.now(),
-        ):
-            color_print(
-                [
-                    (
-                        "#FF0000",
-                        f"It was not possible to assume the role {results['arn']}. Please check you have the right permissions to assume the role",
-                    )
-                ]
-            )
-            pass
-
-        roles.append(Role(results["arn"], results["profile"]))
-        proceed = not inquirer.confirm(
-            message="Do you want to add another role",
-            default=True,
-        ).execute()
-
     credentials = Credentials(
         access_key_id=access_key_id,
         secret_access_key=secret_access_key,
         otp=otp,
         serial=serial,
-        roles=roles,
     )
-    persist(credentials)
+    roles = add_roles_form(credentials)
+    persist(credentials, roles)
     color_print(
         [
             (
                 "#FFE4B5",
-                "Credentials configured. Wait for 30 seconds before assuming the roles",
+                "Credentials configured. Consider waiting for 30 seconds before assuming any role",
             )
         ]
     )
-    color_print([("#FFE4B5", "...")])
-    time.sleep(30)
 
 
 def prompt_role(roles: list[Role]) -> Role:
@@ -219,3 +224,18 @@ def prompt_role(roles: list[Role]) -> Role:
         results["role"],
         [role.profile for role in roles if role.arn == results["role"]][0],
     )
+
+
+def add_role(credentials: Credentials, roles: list[Role]) -> None:
+    color_print([("#FFE4B5", "Adding new roles")])
+    persist(credentials, roles + add_roles_form(credentials))
+
+
+def remove_role(credentials: Credentials, roles: list[Role]) -> None:
+    color_print([("#FFE4B5", "Select the role to remove")])
+    role = prompt_role(roles)
+    for i, o in enumerate(roles):
+        if o.arn == role.arn:
+            del roles[i]
+            break
+    persist(credentials, roles)

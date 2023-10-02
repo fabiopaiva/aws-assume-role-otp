@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 
 [project]
 name = "aws_assume_role_otp"
-version = "0.2"
+version = "0.3"
 description = "A CLI tool to assume a role on AWS using MFA"
 authors = [
   { name="Fábio Paiva", email="fabio@paiva.info" },
